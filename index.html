@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>ระบบเช็คอิน</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      color: #1a1a2e;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: #06c755;
+      color: white;
+      padding: 20px 16px 16px;
+      text-align: center;
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header p  { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+    /* ---- Profile bar ---- */
+    .profile-bar {
+      background: white;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e8ecef;
+    }
+    .avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: #e0e7ef;
+      object-fit: cover;
+    }
+    .profile-info .name  { font-size: 15px; font-weight: 600; }
+    .profile-info .dept  { font-size: 12px; color: #6b7280; margin-top: 1px; }
+
+    /* ---- Status card ---- */
+    .status-card {
+      margin: 16px;
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .status-date { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .badge-none      { background: #f3f4f6; color: #6b7280; }
+    .badge-checkedin { background: #d1fae5; color: #065f46; }
+    .badge-late      { background: #fef3c7; color: #92400e; }
+    .badge-done      { background: #e0e7ff; color: #3730a3; }
+
+    .time-row {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 4px;
+    }
+    .time-block .label { font-size: 11px; color: #9ca3af; margin-bottom: 2px; }
+    .time-block .value { font-size: 20px; font-weight: 700; color: #111; }
+    .time-block .value.empty { color: #d1d5db; }
+
+    /* ---- Action buttons ---- */
+    .actions { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); opacity: 0.9; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-checkin  { background: #06c755; color: white; }
+    .btn-checkout { background: #3b82f6; color: white; }
+    .btn-leave    { background: white; color: #374151; border: 1.5px solid #e5e7eb; }
+
+    /* ---- Camera modal ---- */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px 36px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+
+    #preview {
+      width: 100%; aspect-ratio: 4/3;
+      background: #111;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-bottom: 12px;
+      display: none;
+    }
+    #video {
+      width: 100%; aspect-ratio: 4/3;
+      background: #111;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-bottom: 12px;
+    }
+
+    .gps-status {
+      font-size: 12px; color: #6b7280;
+      text-align: center;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+    .gps-ok   { color: #059669; }
+    .gps-fail { color: #dc2626; }
+
+    .modal-actions { display: flex; gap: 10px; }
+    .btn-snap    { flex: 1; background: #06c755; color: white; }
+    .btn-submit  { flex: 1; background: #3b82f6; color: white; }
+    .btn-cancel  { flex: 1; background: #f3f4f6; color: #374151; }
+
+    /* ---- Leave modal ---- */
+    .leave-modal-box {
+      background: white;
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px 36px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 5px; }
+    .form-group select,
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #111;
+      background: white;
+    }
+    .form-group textarea { min-height: 80px; resize: none; }
+
+    /* ---- Loading ---- */
+    .loading {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.85);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .loading.show { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #06c755;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading p { font-size: 14px; color: #6b7280; }
+
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a1a2e; color: white;
+      padding: 12px 20px; border-radius: 12px;
+      font-size: 14px; z-index: 300;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ---- Register screen ---- */
+    #register-screen {
+      display: none;
+      padding: 32px 20px;
+      text-align: center;
+    }
+    #register-screen h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    #register-screen p  { font-size: 14px; color: #6b7280; margin-bottom: 24px; }
+    .input-group { margin-bottom: 12px; text-align: left; }
+    .input-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; }
+    .input-group input, .input-group select {
+      width: 100%; padding: 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <p id="loading-text">กำลังโหลด...</p>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ======== Main Screen ======== -->
+<div id="main-screen" style="display:none">
+  <div class="header">
+    <h1>ระบบเช็คอิน</h1>
+    <p id="header-date"></p>
+  </div>
+
+  <div class="profile-bar">
+    <img class="avatar" id="profile-pic" src="" alt="avatar">
+    <div class="profile-info">
+      <div class="name" id="profile-name">กำลังโหลด...</div>
+      <div class="dept" id="profile-dept"></div>
+    </div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-date" id="status-date"></div>
+    <div class="status-badge badge-none" id="status-badge">ยังไม่ได้เช็คอิน</div>
+    <div class="time-row">
+      <div class="time-block">
+        <div class="label">เข้างาน</div>
+        <div class="value empty" id="checkin-time">--:--</div>
+      </div>
+      <div class="time-block">
+        <div class="label">ออกงาน</div>
+        <div class="value empty" id="checkout-time">--:--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-checkin"  id="btn-checkin"  onclick="openCamera('checkin')">
+      📍 เช็คอินเข้างาน
+    </button>
+    <button class="btn btn-checkout" id="btn-checkout" onclick="openCamera('checkout')" disabled>
+      🏠 เช็คเอาต์ออกงาน
+    </button>
+    <button class="btn btn-leave" onclick="openLeaveModal()">
+      📋 ขอลา
+    </button>
+  </div>
+</div>
+
+<!-- ======== Register Screen ======== -->
+<div id="register-screen">
+  <h2>ลงทะเบียนพนักงาน</h2>
+  <p>กรอกข้อมูลเพื่อเริ่มใช้ระบบเช็คอินครับ</p>
+  <div class="input-group">
+    <label>แผนก</label>
+    <select id="reg-department">
+      <option value="">-- เลือกแผนก --</option>
+      <option>ฝ่ายขาย</option>
+      <option>ฝ่ายผลิต</option>
+      <option>ฝ่ายบัญชี</option>
+      <option>ฝ่าย HR</option>
+      <option>ฝ่ายบริหาร</option>
+      <option>อื่นๆ</option>
+    </select>
+  </div>
+  <div class="input-group">
+    <label>ตำแหน่ง</label>
+    <input type="text" id="reg-position" placeholder="เช่น พนักงานขาย, ช่างเทคนิค">
+  </div>
+  <button class="btn btn-checkin" style="margin-top:8px" onclick="registerEmployee()">
+    ✅ ลงทะเบียน
+  </button>
+</div>
+
+<!-- ======== Camera Modal ======== -->
+<div class="modal-overlay" id="camera-modal">
+  <div class="modal-box">
+    <div class="modal-title" id="camera-title">ถ่ายรูปยืนยัน</div>
+    <video id="video" autoplay playsinline></video>
+    <img id="preview" alt="preview">
+    <div class="gps-status" id="gps-status">กำลังดึง GPS...</div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeCamera()">ยกเลิก</button>
+      <button class="btn btn-snap"   id="btn-snap"   onclick="snapPhoto()">ถ่ายรูป</button>
+      <button class="btn btn-submit" id="btn-submit-photo" onclick="submitAttendance()" style="display:none">ส่ง</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== Leave Modal ======== -->
+<div class="modal-overlay" id="leave-modal">
+  <div class="leave-modal-box">
+    <div class="modal-title">ขอลา</div>
+    <div class="form-group">
+      <label>ประเภทการลา</label>
+      <select id="leave-type">
+        <option>ลาพักร้อน</option>
+        <option>ลาป่วย</option>
+        <option>ลากิจ</option>
+        <option>ลาไม่รับค่าจ้าง</option>
+        <option>อื่นๆ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>วันที่เริ่มลา</label>
+      <input type="date" id="leave-start">
+    </div>
+    <div class="form-group">
+      <label>วันที่สิ้นสุด</label>
+      <input type="date" id="leave-end">
+    </div>
+    <div class="form-group">
+      <label>เหตุผล</label>
+      <textarea id="leave-reason" placeholder="กรอกเหตุผลการลา..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-cancel" style="flex:1" onclick="closeLeaveModal()">ยกเลิก</button>
+      <button class="btn btn-checkin" style="flex:2" onclick="submitLeave()">ส่งคำขอลา</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — เปลี่ยน 2 บรรทัดนี้เท่านั้น
+// ============================================================
+const LIFF_ID      = "2010069038-Z8m5J7v6";
+const BACKEND_URL  = "YOUR_APPS_SCRIPT_URL"; // ใส่หลัง deploy Apps Script
+
+// ============================================================
+// State
+// ============================================================
+let profile   = null;
+let gpsData   = null;
+let photoBlob = null;
+let currentAction = "checkin"; // "checkin" | "checkout"
+let stream    = null;
+
+// ============================================================
+// Init
+// ============================================================
+async function init() {
+  showLoading("กำลังเชื่อมต่อ LINE...");
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+
+    profile = await liff.getProfile();
+    const status = await callBackend("status", { lineUserId: profile.userId });
+
+    if (!status.registered) {
+      hideLoading();
+      showRegisterScreen();
+    } else {
+      updateMainScreen(status);
+      hideLoading();
+      document.getElementById("main-screen").style.display = "block";
+    }
+  } catch (err) {
+    hideLoading();
+    showToast("เกิดข้อผิดพลาด: " + err.message);
+  }
+}
+
+// ============================================================
+// Register
+// ============================================================
+function showRegisterScreen() {
+  document.getElementById("register-screen").style.display = "block";
+}
+
+async function registerEmployee() {
+  const dept = document.getElementById("reg-department").value;
+  const pos  = document.getElementById("reg-position").value;
+  if (!dept) { showToast("กรุณาเลือกแผนก"); return; }
+
+  showLoading("กำลังลงทะเบียน...");
+  try {
+    const res = await callBackend("register", {
+      lineUserId:   profile.userId,
+      displayName:  profile.displayName,
+      department:   dept,
+      position:     pos,
+    });
+    if (res.success) {
+      document.getElementById("register-screen").style.display = "none";
+      const status = await callBackend("status", { lineUserId: profile.userId });
+      updateMainScreen(status);
+      document.getElementById("main-screen").style.display = "block";
+    } else {
+      showToast(res.message);
+    }
+  } catch (err) {
+    showToast("ลงทะเบียนไม่สำเร็จ: " + err.message);
+  }
+  hideLoading();
+}
+
+// ============================================================
+// Update main screen UI
+// ============================================================
+function updateMainScreen(status) {
+  document.getElementById("profile-pic").src  = profile.pictureUrl || "";
+  document.getElementById("profile-name").textContent = status.employee?.name || profile.displayName;
+  document.getElementById("profile-dept").textContent = status.employee?.department || "";
+
+  const now = new Date();
+  document.getElementById("header-date").textContent =
+    now.toLocaleDateString("th-TH", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+  document.getElementById("status-date").textContent =
+    now.toLocaleDateString("th-TH", { year:"numeric", month:"long", day:"numeric" });
+
+  const badge    = document.getElementById("status-badge");
+  const ciTime   = document.getElementById("checkin-time");
+  const coTime   = document.getElementById("checkout-time");
+  const btnCI    = document.getElementById("btn-checkin");
+  const btnCO    = document.getElementById("btn-checkout");
+
+  if (!status.checkedIn) {
+    badge.className = "status-badge badge-none";
+    badge.textContent = "ยังไม่ได้เช็คอิน";
+    ciTime.className = "value empty"; ciTime.textContent = "--:--";
+    coTime.className = "value empty"; coTime.textContent = "--:--";
+    btnCI.disabled = false;
+    btnCO.disabled = true;
+  } else if (status.checkedIn && !status.checkedOut) {
+    if (status.lateMinutes > 0) {
+      badge.className = "status-badge badge-late";
+      badge.textContent = "สาย " + status.lateMinutes + " นาที";
+    } else {
+      badge.className = "status-badge badge-checkedin";
+      badge.textContent = "เช็คอินแล้ว — ตรงเวลา";
+    }
+    ciTime.className = "value"; ciTime.textContent = status.checkinTime;
+    coTime.className = "value empty"; coTime.textContent = "--:--";
+    btnCI.disabled = true;
+    btnCO.disabled = false;
+  } else {
+    badge.className = "status-badge badge-done";
+    badge.textContent = "เสร็จงานวันนี้";
+    ciTime.className = "value"; ciTime.textContent = status.checkinTime;
+    coTime.className = "value"; coTime.textContent = status.checkoutTime;
+    btnCI.disabled = true;
+    btnCO.disabled = true;
+  }
+}
+
+// ============================================================
+// Camera
+// ============================================================
+async function openCamera(action) {
+  currentAction = action;
+  photoBlob = null;
+  gpsData   = null;
+
+  document.getElementById("camera-title").textContent =
+    action === "checkin" ? "ถ่ายรูปยืนยันการเข้างาน" : "ถ่ายรูปยืนยันการออกงาน";
+  document.getElementById("btn-snap").style.display = "inline-flex";
+  document.getElementById("btn-submit-photo").style.display = "none";
+  document.getElementById("preview").style.display = "none";
+  document.getElementById("video").style.display = "block";
+  document.getElementById("gps-status").textContent = "กำลังดึง GPS...";
+  document.getElementById("gps-status").className = "gps-status";
+  document.getElementById("camera-modal").classList.add("open");
+
+  // Start camera
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    document.getElementById("video").srcObject = stream;
+  } catch (e) {
+    showToast("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาต");
+  }
+
+  // Get GPS
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      gpsData = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+      document.getElementById("gps-status").textContent =
+        `GPS: ±${Math.round(gpsData.accuracy)}m`;
+      document.getElementById("gps-status").className = "gps-status gps-ok";
+    },
+    () => {
+      document.getElementById("gps-status").textContent = "ไม่สามารถดึง GPS ได้";
+      document.getElementById("gps-status").className = "gps-status gps-fail";
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function snapPhoto() {
+  const video  = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  const preview = document.getElementById("preview");
+  preview.src = canvas.toDataURL("image/jpeg", 0.7);
+  preview.style.display = "block";
+  video.style.display = "none";
+
+  canvas.toBlob((blob) => { photoBlob = blob; }, "image/jpeg", 0.7);
+
+  document.getElementById("btn-snap").style.display = "none";
+  document.getElementById("btn-submit-photo").style.display = "inline-flex";
+
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+function closeCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  document.getElementById("camera-modal").classList.remove("open");
+}
+
+async function submitAttendance() {
+  if (!photoBlob) { showToast("กรุณาถ่ายรูปก่อน"); return; }
+
+  showLoading(currentAction === "checkin" ? "กำลังบันทึกเช็คอิน..." : "กำลังบันทึกเช็คเอาต์...");
+  closeCamera();
+
+  try {
+    // Upload photo to Apps Script (base64)
+    const photoBase64 = await blobToBase64(photoBlob);
+
+    const payload = {
+      lineUserId: profile.userId,
+      lat:        gpsData?.lat || null,
+      lng:        gpsData?.lng || null,
+      accuracy:   gpsData?.accuracy || null,
+      photoBase64: photoBase64,
+    };
+
+    const res = await callBackend(currentAction, payload);
+
+    if (res.success) {
+      showToast(currentAction === "checkin" ? "เช็คอินสำเร็จ!" : "เช็คเอาต์สำเร็จ!");
+      const status = await callBackend("status", { lineUserId: profile.userId });
+      updateMainScreen(status);
+    } else {
+      showToast(res.message || "เกิดข้อผิดพลาด");
+    }
+  } catch (err) {
+    showToast("เกิดข้อผิดพลาด: " + err.message);
+  }
+  hideLoading();
+}
+
+// ============================================================
+// Leave
+// ============================================================
+function openLeaveModal() {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("leave-start").value = today;
+  document.getElementById("leave-end").value   = today;
+  document.getElementById("leave-modal").classList.add("open");
+}
+function closeLeaveModal() {
+  document.getElementById("leave-modal").classList.remove("open");
+}
+
+async function submitLeave() {
+  const type  = document.getElementById("leave-type").value;
+  const start = document.getElementById("leave-start").value;
+  const end   = document.getElementById("leave-end").value;
+  const reason= document.getElementById("leave-reason").value;
+
+  if (!reason) { showToast("กรุณากรอกเหตุผลการลา"); return; }
+  if (start > end) { showToast("วันเริ่มต้นต้องไม่เกินวันสิ้นสุด"); return; }
+
+  const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+
+  showLoading("กำลังส่งคำขอลา...");
+  closeLeaveModal();
+
+  try {
+    const res = await callBackend("leave", {
+      lineUserId: profile.userId,
+      leaveType:  type,
+      startDate:  start,
+      endDate:    end,
+      totalDays:  days,
+      reason:     reason,
+    });
+    showToast(res.success ? "ส่งคำขอลาสำเร็จ!" : res.message);
+  } catch (err) {
+    showToast("เกิดข้อผิดพลาด");
+  }
+  hideLoading();
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+async function callBackend(action, data) {
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...data }),
+  });
+  return res.json();
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(",")[1]);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function showLoading(text) {
+  document.getElementById("loading-text").textContent = text || "กำลังโหลด...";
+  document.getElementById("loading").classList.add("show");
+}
+function hideLoading() {
+  document.getElementById("loading").classList.remove("show");
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ============================================================
+// Start
+// ============================================================
+init();
+</script>
+</body>
+</html>
