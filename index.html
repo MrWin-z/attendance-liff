@@ -365,6 +365,7 @@ let profile   = null;
 let gpsData   = null;
 let photoBlob = null;
 let currentAction = "checkin"; // "checkin" | "checkout"
+let lastCheckinTime = null;
 let stream    = null;
 
 // ============================================================
@@ -383,6 +384,7 @@ async function init() {
       hideLoading();
       showRegisterScreen();
     } else {
+      if (status.checkinTime) lastCheckinTime = status.checkinTime;
       updateMainScreen(status);
       hideLoading();
       document.getElementById("main-screen").style.display = "block";
@@ -565,8 +567,33 @@ async function submitAttendance() {
 
     if (res.success) {
       showToast(currentAction === "checkin" ? "เช็คอินสำเร็จ!" : "เช็คเอาต์สำเร็จ!");
-      const status = await callBackend("status", { lineUserId: profile.userId });
-      updateMainScreen(status);
+      // อัพเดท UI ทันทีจาก response โดยไม่ต้องรอ getStatus
+      if (currentAction === "checkin") {
+        lastCheckinTime = res.time;
+        updateMainScreen({
+          employee:    { name: profile.displayName, department: "" },
+          checkedIn:   true,
+          checkedOut:  false,
+          checkinTime: res.time,
+          checkoutTime: null,
+          status:      res.status,
+          lateMinutes: res.lateMinutes || 0,
+        });
+      } else {
+        updateMainScreen({
+          employee:    { name: profile.displayName, department: "" },
+          checkedIn:   true,
+          checkedOut:  true,
+          checkinTime: lastCheckinTime,
+          checkoutTime: res.time,
+          status:      "done",
+          lateMinutes: 0,
+        });
+      }
+      // sync กับ server ในพื้นหลัง
+      callBackend("status", { lineUserId: profile.userId })
+        .then(s => updateMainScreen(s))
+        .catch(() => {});
     } else {
       showToast(res.message || "เกิดข้อผิดพลาด");
     }
