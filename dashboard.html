@@ -170,7 +170,7 @@ tbody td{padding:11px 16px;font-size:13px}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>วันที่</th><th>พนักงาน</th><th>รหัส</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th><th>รูปเข้า</th><th>รูปออก</th></tr></thead>
+            <thead><tr><th>วันที่</th><th>พนักงาน</th><th>รหัส</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th><th>ออกก่อน (นาที)</th><th>รูปเข้า</th><th>รูปออก</th></tr></thead>
             <tbody id="att-tbody"></tbody>
           </table>
         </div>
@@ -225,7 +225,7 @@ tbody td{padding:11px 16px;font-size:13px}
           <div class="section-header"><div class="section-title" id="exp-table-title">ตัวอย่างข้อมูล</div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>วันที่</th><th>ชื่อ-นามสกุล</th><th>รหัส</th><th>แผนก</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th></tr></thead>
+              <thead><tr><th>วันที่</th><th>ชื่อ-นามสกุล</th><th>รหัส</th><th>แผนก</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th><th>ออกก่อน (นาที)</th></tr></thead>
               <tbody id="exp-tbody"></tbody>
             </table>
           </div>
@@ -427,7 +427,9 @@ function renderAttendance() {
   var tbody = document.getElementById("att-tbody");
   if (!rows.length) { tbody.innerHTML = emptyRow(9, "ไม่พบข้อมูล"); return; }
   tbody.innerHTML = rows.map(function(r){
-    return "<tr><td class='mono'>" + fmtDate(r.date) + "</td><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"<span style='color:var(--muted)'>-</span>") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes > 0 ? "<span style='color:var(--amber)'>" + r.late_minutes + "</span>" : "-") + "</td><td>" + photoBtn(r.checkin_photo) + "</td><td>" + photoBtn(r.checkout_photo) + "</td></tr>";
+    var earlyMins = calcEarlyMinutes(r);
+    var earlyCell = earlyMins > 0 ? "<span style='color:var(--purple)'>" + earlyMins + "</span>" : "-";
+    return "<tr><td class='mono'>" + fmtDate(r.date) + "</td><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"<span style='color:var(--muted)'>-</span>") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes > 0 ? "<span style='color:var(--amber)'>" + r.late_minutes + "</span>" : "-") + "</td><td class='mono'>" + earlyCell + "</td><td>" + photoBtn(r.checkin_photo) + "</td><td>" + photoBtn(r.checkout_photo) + "</td></tr>";
   }).join("");
 }
 
@@ -585,16 +587,18 @@ function previewExport() {
   if (!rows.length) { tbody.innerHTML = emptyRow(8, "ไม่พบข้อมูลตามเงื่อนไข"); return; }
   var preview = rows.slice(0, 20);
   tbody.innerHTML = preview.map(function(r){
-    return "<tr><td class='mono'>" + fmtDate(r.date) + "</td><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td>" + (r.department||"-") + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"-") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes||"-") + "</td></tr>";
-  }).join("") + (rows.length > 20 ? "<tr><td colspan='8' style='text-align:center;color:var(--muted);padding:10px;font-size:12px'>แสดง 20 จาก " + rows.length + " รายการ</td></tr>" : "");
+    var em = calcEarlyMinutes(r);
+    return "<tr><td class='mono'>" + fmtDate(r.date) + "</td><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td>" + (r.department||"-") + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"-") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes||"-") + "</td><td class='mono'>" + (em > 0 ? "<span style='color:var(--purple)'>" + em + "</span>" : "-") + "</td></tr>";
+  }).join("") + (rows.length > 20 ? "<tr><td colspan='9' style='text-align:center;color:var(--muted);padding:10px;font-size:12px'>แสดง 20 จาก " + rows.length + " รายการ</td></tr>" : "");
 }
 
 function doExportCsv() {
   var rows = getExportRows();
   if (!rows.length) { showToast("ไม่พบข้อมูล", "error"); return; }
-  var headers = ["วันที่","ชื่อ-นามสกุล","รหัสพนักงาน","แผนก","เวลาเข้างาน","เวลาออกงาน","สถานะ","สาย (นาที)"];
+  var headers = ["วันที่","ชื่อ-นามสกุล","รหัสพนักงาน","แผนก","เวลาเข้างาน","เวลาออกงาน","สถานะ","สาย (นาที)","ออกก่อนเวลา (นาที)"];
   var csv = [headers.join(",")].concat(rows.map(function(r){
-    return [fmtDate(r.date), '"' + (r.full_name||"") + '"', r.employee_code||"", '"' + (r.department||"") + '"', fmtTime(r.checkin_time)||"", fmtTime(r.checkout_time)||"", r.status||"", r.late_minutes||"0"].join(",");
+    var em = calcEarlyMinutes(r);
+    return [fmtDate(r.date), '"' + (r.full_name||"") + '"', r.employee_code||"", '"' + (r.department||"") + '"', fmtTime(r.checkin_time)||"", fmtTime(r.checkout_time)||"", r.status||"", r.late_minutes||"0", em||"0"].join(",");
   })).join("\n");
   downloadFile("\uFEFF" + csv, buildFilename("csv"), "text/csv;charset=utf-8;");
   showToast("Export CSV " + rows.length + " รายการสำเร็จ", "success");
@@ -618,8 +622,9 @@ function doExportTxt() {
     lines.push(pad("รหัส",8) + pad("วันที่",14) + pad("เข้างาน",10) + pad("ออกงาน",10) + "สถานะ");
     lines.push(dash);
     rows.forEach(function(r){
-      var late = r.late_minutes > 0 ? " (สาย " + r.late_minutes + " นาที)" : "";
-      lines.push(pad(r.employee_code,8) + pad(fmtDate(r.date),14) + pad(fmtTime(r.checkin_time)||"-",10) + pad(fmtTime(r.checkout_time)||"-",10) + (r.status||"-") + late);
+      var late  = r.late_minutes > 0 ? " สาย " + r.late_minutes + "น." : "";
+      var early = calcEarlyMinutes(r) > 0 ? " ออกก่อน " + calcEarlyMinutes(r) + "น." : "";
+      lines.push(pad(r.employee_code,8) + pad(fmtDate(r.date),14) + pad(fmtTime(r.checkin_time)||"-",10) + pad(fmtTime(r.checkout_time)||"-",10) + (r.status||"-") + late + early);
     });
     lines.push(dash);
     lines.push("  รวม " + rows.length + " วัน");
@@ -638,8 +643,9 @@ function doExportTxt() {
       lines.push(pad("รหัส",8) + pad("ชื่อ-นามสกุล",22) + pad("เข้างาน",10) + pad("ออกงาน",10) + "สถานะ");
       lines.push(dash);
       byDate[date].forEach(function(r){
-        var late = r.late_minutes > 0 ? " (สาย " + r.late_minutes + " นาที)" : "";
-        lines.push(pad(r.employee_code,8) + pad((r.full_name||"-").substring(0,20),22) + pad(fmtTime(r.checkin_time)||"-",10) + pad(fmtTime(r.checkout_time)||"-",10) + (r.status||"-") + late);
+        var late  = r.late_minutes > 0 ? " สาย " + r.late_minutes + "น." : "";
+        var early = calcEarlyMinutes(r) > 0 ? " ออกก่อน " + calcEarlyMinutes(r) + "น." : "";
+        lines.push(pad(r.employee_code,8) + pad((r.full_name||"-").substring(0,20),22) + pad(fmtTime(r.checkin_time)||"-",10) + pad(fmtTime(r.checkout_time)||"-",10) + (r.status||"-") + late + early);
       });
       lines.push("  รวม " + byDate[date].length + " คน");
       lines.push("");
