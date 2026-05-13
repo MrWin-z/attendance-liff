@@ -515,11 +515,19 @@ function fmtDate(val) {
 
 function fmtTime(val) {
   if (!val) return "";
+  // gviz returns time as fraction of day (number)
   if (typeof val === "number") {
     const totalMins = Math.round(val * 24 * 60);
     const h = Math.floor(totalMins / 60) % 24;
     const m = totalMins % 60;
-    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0");
+  }
+  // gviz Date( format: "Date(2026,4,13,8,35,0)"
+  if (typeof val === "string" && val.startsWith("Date(")) {
+    const p = val.match(/\d+/g);
+    if (p && p.length >= 5) {
+      return String(p[3]).padStart(2,"0") + ":" + String(p[4]).padStart(2,"0");
+    }
   }
   return String(val).substring(0, 5);
 }
@@ -553,6 +561,13 @@ function roleBadge(r) {
   return '<span class="badge badge-gray">พนักงาน</span>';
 }
 
+function driveDirectUrl(url) {
+  if (!url) return "";
+  // https://drive.google.com/file/d/FILE_ID/view → https://drive.google.com/thumbnail?id=FILE_ID&sz=w800
+  const m = url.match(/\/file\/d\/([^/]+)/);
+  if (m) return "https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w800";
+  return url;
+}
 function photoBtn(url) {
   if (!url) return '<span style="color:var(--muted)">-</span>';
   return `<button class="btn btn-blue btn-sm" onclick="openPhoto('${url}')">ดูรูป</button>`;
@@ -563,7 +578,7 @@ function emptyRow(cols, msg) {
 }
 
 function openPhoto(url) {
-  document.getElementById("modal-img").src = url;
+  document.getElementById("modal-img").src = driveDirectUrl(url);
   document.getElementById("photo-modal").classList.add("open");
 }
 function closePhoto() {
