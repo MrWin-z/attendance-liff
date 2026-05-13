@@ -158,6 +158,8 @@ tbody td{padding:11px 16px;font-size:13px;white-space:nowrap}
       <div class="nav-item active" onclick="showPage('p-today')"><div class="nav-dot"></div>ภาพรวมวันนี้</div>
       <div class="nav-item" onclick="showPage('p-attendance')"><div class="nav-dot"></div>ประวัติเข้า-ออกงาน</div>
       <div class="nav-item" onclick="showPage('p-employees')"><div class="nav-dot"></div>พนักงาน</div>
+      <div class="nav-section">รายงาน</div>
+      <div class="nav-item" onclick="showPage('p-export')"><div class="nav-dot"></div>Export รายงาน</div>
       <div class="nav-section">การลา</div>
       <div class="nav-item" onclick="showPage('p-leave')"><div class="nav-dot"></div>คำขอลา <span id="leave-badge" style="margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;display:none"></span></div>
     </div>
@@ -252,6 +254,65 @@ tbody td{padding:11px 16px;font-size:13px;white-space:nowrap}
         </div>
       </div>
 
+
+      <!-- ======== Export ======== -->
+      <div class="page" id="p-export">
+        <div class="page-title">Export รายงาน</div>
+        <div class="page-sub">เลือกเงื่อนไขแล้วกด Export เป็น CSV</div>
+
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:520px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+            <div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">ชื่อพนักงาน</div>
+              <select class="filter-input" id="exp-name" style="width:100%">
+                <option value="">ทุกคน</option>
+              </select>
+            </div>
+
+            <div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">วันที่เริ่มต้น</div>
+              <input type="date" class="filter-input" id="exp-date-from" style="width:100%">
+            </div>
+
+            <div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">วันที่สิ้นสุด</div>
+              <input type="date" class="filter-input" id="exp-date-to" style="width:100%">
+            </div>
+
+            <div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">สถานะ</div>
+              <select class="filter-input" id="exp-status" style="width:100%">
+                <option value="">ทุกสถานะ</option>
+                <option>ตรงเวลา</option>
+                <option>สาย</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Preview count -->
+          <div style="font-size:13px;color:var(--muted);margin-bottom:16px" id="exp-preview">เลือกเงื่อนไขแล้วกด Preview</div>
+
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-blue" onclick="previewExport()" style="padding:10px 20px;font-size:13px">Preview</button>
+            <button class="btn btn-green" onclick="doExport()" style="padding:10px 20px;font-size:13px">⬇ Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Preview table -->
+        <div style="margin-top:24px" id="exp-table-wrap" style="display:none">
+          <div class="section-header"><div class="section-title" id="exp-table-title">ตัวอย่างข้อมูล</div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>วันที่</th><th>ชื่อ-นามสกุล</th><th>รหัส</th><th>แผนก</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th>
+              </tr></thead>
+              <tbody id="exp-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /main -->
   </div><!-- /layout -->
 </div><!-- /app -->
@@ -313,7 +374,7 @@ function initApp() {
   const todayStr = now.toISOString().split("T")[0];
   document.getElementById("att-date").value = todayStr;
 
-  loadAll();
+  loadAll().then(() => initExportFilters());
 }
 
 async function loadAll() {
@@ -598,6 +659,100 @@ function showToast(msg, type="success") {
   t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove("show"), 3000);
 }
+
+// ============================================================
+// Export
+// ============================================================
+function initExportFilters() {
+  const sel = document.getElementById("exp-name");
+  const names = [...new Set(DATA.attendance.map(r => r.full_name).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">ทุกคน</option>' + names.map(n => `<option>${n}</option>`).join("");
+
+  // default date range = this month
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0");
+  const lastDay = new Date(y, now.getMonth()+1, 0).getDate();
+  document.getElementById("exp-date-from").value = `${y}-${m}-01`;
+  document.getElementById("exp-date-to").value   = `${y}-${m}-${lastDay}`;
+}
+
+function getExportRows() {
+  const name     = document.getElementById("exp-name").value;
+  const dateFrom = document.getElementById("exp-date-from").value;
+  const dateTo   = document.getElementById("exp-date-to").value;
+  const status   = document.getElementById("exp-status").value;
+
+  return DATA.attendance.filter(r => {
+    const d = fmtDate(r.date);
+    if (name   && r.full_name !== name) return false;
+    if (status && r.status !== status)  return false;
+    if (dateFrom && d < dateFrom)       return false;
+    if (dateTo   && d > dateTo)         return false;
+    return true;
+  }).sort((a,b) => fmtDate(a.date).localeCompare(fmtDate(b.date)));
+}
+
+function previewExport() {
+  initExportFilters();
+  const rows  = getExportRows();
+  const tbody = document.getElementById("exp-tbody");
+  const wrap  = document.getElementById("exp-table-wrap");
+  const title = document.getElementById("exp-table-title");
+
+  document.getElementById("exp-preview").textContent = `พบ ${rows.length} รายการ`;
+  title.textContent = `ตัวอย่างข้อมูล (${rows.length} รายการ)`;
+  wrap.style.display = "block";
+
+  if (!rows.length) { tbody.innerHTML = emptyRow(8, "ไม่พบข้อมูลตามเงื่อนไข"); return; }
+
+  tbody.innerHTML = rows.slice(0, 20).map(r => `
+    <tr>
+      <td class="mono">${fmtDate(r.date)}</td>
+      <td>${r.full_name}</td>
+      <td class="mono">${r.employee_code}</td>
+      <td>${r.department || '-'}</td>
+      <td class="mono">${fmtTime(r.checkin_time) || '-'}</td>
+      <td class="mono">${fmtTime(r.checkout_time) || '-'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="mono">${r.late_minutes || '-'}</td>
+    </tr>`).join("") + (rows.length > 20 ? `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:12px;font-size:12px">แสดง 20 จาก ${rows.length} รายการ — กด Export เพื่อดาวน์โหลดทั้งหมด</td></tr>` : "");
+}
+
+function doExport() {
+  const rows = getExportRows();
+  if (!rows.length) { showToast("ไม่พบข้อมูลตามเงื่อนไข", "error"); return; }
+
+  const headers = ["วันที่","ชื่อ-นามสกุล","รหัสพนักงาน","แผนก","เวลาเข้างาน","เวลาออกงาน","สถานะ","สาย (นาที)","GPS เข้า","GPS ออก"];
+  const csvRows = [
+    headers.join(","),
+    ...rows.map(r => [
+      fmtDate(r.date),
+      `"${r.full_name || ''}"`,
+      r.employee_code || '',
+      `"${r.department || ''}"`,
+      fmtTime(r.checkin_time) || '',
+      fmtTime(r.checkout_time) || '',
+      r.status || '',
+      r.late_minutes || '0',
+      (r.checkin_lat && r.checkin_lng) ? `${r.checkin_lat},${r.checkin_lng}` : '',
+      (r.checkout_lat && r.checkout_lng) ? `${r.checkout_lat},${r.checkout_lng}` : '',
+    ].join(","))
+  ];
+
+  const bom  = "﻿"; // UTF-8 BOM สำหรับ Excel ภาษาไทย
+  const blob = new Blob([bom + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  const name = document.getElementById("exp-name").value || "ทุกคน";
+  const from = document.getElementById("exp-date-from").value;
+  const to   = document.getElementById("exp-date-to").value;
+  a.href     = url;
+  a.download = `attendance_${name}_${from}_${to}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Export ${rows.length} รายการสำเร็จ`, "success");
+}
+
 </script>
 </body>
 </html>
