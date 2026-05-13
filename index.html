@@ -590,9 +590,11 @@ async function submitAttendance() {
           lateMinutes: 0,
         });
       }
-      // sync กับ server ในพื้นหลัง
+      // sync กับ server ในพื้นหลัง — อัพเดทเฉพาะถ้าข้อมูลครบ
       callBackend("status", { lineUserId: profile.userId })
-        .then(s => updateMainScreen(s))
+        .then(s => {
+          if (s.registered && s.checkedIn && s.checkinTime) updateMainScreen(s);
+        })
         .catch(() => {});
     } else {
       showToast(res.message || "เกิดข้อผิดพลาด");
