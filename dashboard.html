@@ -372,11 +372,34 @@ tbody td{padding:11px 16px;font-size:13px;white-space:nowrap}
     <div style="margin-top:16px">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">วันทำงาน</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap" id="day-checkboxes">
-        ${["อา","จ","อ","พ","พฤ","ศ","ส"].map((d,i) => `
         <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
-          <input type="checkbox" class="day-cb" value="${i}" style="width:16px;height:16px;accent-color:var(--accent)">
-          <span style="font-size:12px;color:var(--muted)">${d}</span>
-        </label>`).join("")}
+          <input type="checkbox" class="day-cb" value="0" style="width:16px;height:16px;accent-color:var(--accent)">
+          <span style="font-size:12px;color:var(--muted)">อา</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="1" style="width:16px;height:16px;accent-color:var(--accent)" checked>
+          <span style="font-size:12px;color:var(--muted)">จ</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="2" style="width:16px;height:16px;accent-color:var(--accent)" checked>
+          <span style="font-size:12px;color:var(--muted)">อ</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="3" style="width:16px;height:16px;accent-color:var(--accent)" checked>
+          <span style="font-size:12px;color:var(--muted)">พ</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="4" style="width:16px;height:16px;accent-color:var(--accent)" checked>
+          <span style="font-size:12px;color:var(--muted)">พฤ</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="5" style="width:16px;height:16px;accent-color:var(--accent)" checked>
+          <span style="font-size:12px;color:var(--muted)">ศ</span>
+        </label>
+        <label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" class="day-cb" value="6" style="width:16px;height:16px;accent-color:var(--accent)">
+          <span style="font-size:12px;color:var(--muted)">ส</span>
+        </label>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px">
