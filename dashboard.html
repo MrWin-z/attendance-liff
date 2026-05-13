@@ -148,7 +148,7 @@ tbody td{padding:11px 16px;font-size:13px}
         <div class="section-header"><div class="section-title">เช็คอินวันนี้</div></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>พนักงาน</th><th>รหัส</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th><th>รูปเข้า</th><th>รูปออก</th></tr></thead>
+            <thead><tr><th>พนักงาน</th><th>รหัส</th><th>เวลาเข้า</th><th>เวลาออก</th><th>สถานะ</th><th>สาย (นาที)</th><th>ออกก่อน (นาที)</th><th>รูปเข้า</th><th>รูปออก</th></tr></thead>
             <tbody id="today-tbody"></tbody>
           </table>
         </div>
@@ -407,7 +407,9 @@ function renderToday() {
   var tbody = document.getElementById("today-tbody");
   if (!rows.length) { tbody.innerHTML = emptyRow(8, "ยังไม่มีการเช็คอินวันนี้"); return; }
   tbody.innerHTML = rows.map(function(r){
-    return "<tr><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"<span style='color:var(--muted)'>-</span>") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes > 0 ? "<span style='color:var(--amber)'>" + r.late_minutes + "</span>" : "-") + "</td><td>" + photoBtn(r.checkin_photo) + "</td><td>" + photoBtn(r.checkout_photo) + "</td></tr>";
+    var earlyMins = calcEarlyMinutes(r);
+    var earlyCell = earlyMins > 0 ? "<span style='color:var(--purple)'>" + earlyMins + "</span>" : "-";
+    return "<tr><td>" + r.full_name + "</td><td class='mono'>" + r.employee_code + "</td><td class='mono'>" + (fmtTime(r.checkin_time)||"-") + "</td><td class='mono'>" + (fmtTime(r.checkout_time)||"<span style='color:var(--muted)'>-</span>") + "</td><td>" + statusBadge(r.status) + "</td><td class='mono'>" + (r.late_minutes > 0 ? "<span style='color:var(--amber)'>" + r.late_minutes + "</span>" : "-") + "</td><td class='mono'>" + earlyCell + "</td><td>" + photoBtn(r.checkin_photo) + "</td><td>" + photoBtn(r.checkout_photo) + "</td></tr>";
   }).join("");
 }
 
@@ -662,6 +664,21 @@ function downloadFile(content, filename, mimeType) {
   URL.revokeObjectURL(url);
 }
 
+function calcEarlyMinutes(r) {
+  if (!r.checkout_time || !r.checkout_time) return 0;
+  // หา schedule ของพนักงาน
+  var sch = DATA.schedules.find(function(s){ return s.employee_code === r.employee_code; });
+  var endTime = sch ? (fmtTime(sch.work_end) || "18:00") : "18:00";
+  var coTime  = fmtTime(r.checkout_time);
+  if (!coTime || coTime === "-") return 0;
+  var endParts = endTime.split(":").map(Number);
+  var coParts  = coTime.split(":").map(Number);
+  if (endParts.length < 2 || coParts.length < 2) return 0;
+  var endMins = endParts[0] * 60 + endParts[1];
+  var coMins  = coParts[0]  * 60 + coParts[1];
+  return Math.max(0, endMins - coMins);
+}
+
 function showPage(el) {
   document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
   document.querySelectorAll(".nav-item").forEach(function(n){ n.classList.remove("active"); });
@@ -690,19 +707,25 @@ function getTodayStr() {
 }
 
 function fmtDate(val) {
-  if (!val) return "";
+  if (!val && val !== 0) return "";
   if (typeof val === "number") {
+    if (val <= 1) return ""; // Google Sheets serial 0 = 1899-12-30
     var d = new Date(Math.round((val - 25569) * 86400000));
+    var yr = d.getFullYear();
+    if (yr < 2000) return ""; // ป้องกัน date ผิดปกติ
     return d.toISOString().split("T")[0];
   }
   if (typeof val === "string" && val.indexOf("Date(") !== -1) {
     var p = val.match(/\d+/g);
     if (p && p.length >= 3) {
-      var yr = p[0], mo = String(Number(p[1])+1).padStart(2,"0"), dy = String(p[2]).padStart(2,"0");
+      var yr = Number(p[0]), mo = String(Number(p[1])+1).padStart(2,"0"), dy = String(p[2]).padStart(2,"0");
+      if (yr < 2000) return ""; // ป้องกัน 1899
       return yr + "-" + mo + "-" + dy;
     }
   }
-  return String(val).substring(0, 10);
+  var s = String(val).substring(0, 10);
+  if (s.startsWith("1899")) return "";
+  return s;
 }
 
 function fmtTime(val) {
@@ -725,7 +748,7 @@ function statusBadge(s) {
   if (s === "ตรงเวลา")           return "<span class='badge badge-green'>ตรงเวลา</span>";
   if (s === "สาย")                return "<span class='badge badge-amber'>สาย</span>";
   if (s === "ออกก่อนเวลา")       return "<span class='badge badge-purple'>ออกก่อนเวลา</span>";
-  if (s === "สาย + ออกก่อนเวลา") return "<span class='badge badge-red'>สาย+ออกก่อน</span>";
+  if (s === "สาย + ออกก่อนเวลา") return "<span class='badge badge-red'>สาย/ออกก่อนเวลา</span>";
   if (s === "ลา")                 return "<span class='badge badge-blue'>ลา</span>";
   if (s === "ขาดงาน")             return "<span class='badge badge-red'>ขาดงาน</span>";
   return "<span class='badge badge-gray'>" + s + "</span>";
