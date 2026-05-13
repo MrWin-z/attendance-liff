@@ -221,7 +221,7 @@ tbody td{padding:11px 16px;font-size:13px;white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>รหัส</th><th>ชื่อ</th><th>แผนก</th><th>ตำแหน่ง</th><th>บทบาท</th><th>สถานะ</th><th>ลงทะเบียนเมื่อ</th>
+              <th>รหัส</th><th>ชื่อ-นามสกุล</th><th>แผนก</th><th>ตำแหน่งงาน</th><th>บทบาท</th><th>สถานะ</th><th>ลงทะเบียนเมื่อ</th>
             </tr></thead>
             <tbody id="emp-tbody"></tbody>
           </table>
@@ -426,7 +426,7 @@ function renderEmployees() {
       <td class="mono">${r.employee_code}</td>
       <td>${r.full_name}</td>
       <td>${r.department || '-'}</td>
-      <td>${r.position || '-'}</td>
+      <td>${r.position || r.job_title || '-'}</td>
       <td>${roleBadge(r.role)}</td>
       <td>${r.status === "active" ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Inactive</span>'}</td>
       <td class="mono" style="color:var(--muted);font-size:11px">${fmtDate(r.created_at)}</td>
