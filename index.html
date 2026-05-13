@@ -283,6 +283,14 @@
   <h2>ลงทะเบียนพนักงาน</h2>
   <p>กรอกข้อมูลเพื่อเริ่มใช้ระบบเช็คอินครับ</p>
   <div class="input-group">
+    <label>ชื่อ</label>
+    <input type="text" id="reg-firstname" placeholder="ชื่อจริง">
+  </div>
+  <div class="input-group">
+    <label>นามสกุล</label>
+    <input type="text" id="reg-lastname" placeholder="นามสกุล">
+  </div>
+  <div class="input-group">
     <label>แผนก</label>
     <select id="reg-department">
       <option value="">-- เลือกแผนก --</option>
@@ -295,8 +303,8 @@
     </select>
   </div>
   <div class="input-group">
-    <label>ตำแหน่ง</label>
-    <input type="text" id="reg-position" placeholder="เช่น พนักงานขาย, ช่างเทคนิค">
+    <label>ตำแหน่งงาน</label>
+    <input type="text" id="reg-jobtitle" placeholder="เช่น วิศวกร, เจ้าหน้าที่บัญชี">
   </div>
   <button class="btn btn-checkin" style="margin-top:8px" onclick="registerEmployee()">
     ✅ ลงทะเบียน
@@ -403,17 +411,24 @@ function showRegisterScreen() {
 }
 
 async function registerEmployee() {
-  const dept = document.getElementById("reg-department").value;
-  const pos  = document.getElementById("reg-position").value;
-  if (!dept) { showToast("กรุณาเลือกแผนก"); return; }
+  const firstName = document.getElementById("reg-firstname").value.trim();
+  const lastName  = document.getElementById("reg-lastname").value.trim();
+  const dept      = document.getElementById("reg-department").value;
+  const jobTitle  = document.getElementById("reg-jobtitle").value.trim();
+
+  if (!firstName) { showToast("กรุณากรอกชื่อ"); return; }
+  if (!lastName)  { showToast("กรุณากรอกนามสกุล"); return; }
+  if (!dept)      { showToast("กรุณาเลือกแผนก"); return; }
 
   showLoading("กำลังลงทะเบียน...");
   try {
     const res = await callBackend("register", {
       lineUserId:   profile.userId,
       displayName:  profile.displayName,
+      firstName,
+      lastName,
       department:   dept,
-      position:     pos,
+      jobTitle,
     });
     if (res.success) {
       document.getElementById("register-screen").style.display = "none";
